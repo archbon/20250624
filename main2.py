@@ -1,60 +1,45 @@
+import pandas as pd
 import streamlit as st
 
-# 🌟 페이지 기본 설정
-st.set_page_config(page_title="MBTI 직업 추천기", page_icon="🧠", layout="centered")
+# 📁 CSV 파일 불러오기 (EUC-KR 인코딩)
+@st.cache_data
+def load_data():
+    df = pd.read_csv("202505_202505_연령별인구현황_월간.csv", encoding="euc-kr")
+    df["2025년05월_계_총인구수"] = df["2025년05월_계_총인구수"].str.replace(",", "").astype(int)
+    top5 = df.nlargest(5, "2025년05월_계_총인구수").copy()
 
-# 🎈 타이틀 & 소개
-st.title("🔍 MBTI 성격 유형 기반 직업 추천 🎯")
+    age_columns = [col for col in top5.columns if col.startswith("2025년05월_계_") and "세" in col]
+    new_col_names = [col.split("_")[-1].replace("세", "").replace(" ", "").replace("이상", "100+") for col in age_columns]
+
+    age_df = top5[age_columns].copy()
+    age_df.columns = new_col_names
+    age_df.insert(0, "행정구역", top5["행정구역"])
+    age_df.insert(1, "총인구수", top5["2025년05월_계_총인구수"])
+
+    return age_df
+
+# 📊 데이터 불러오기
+df = load_data()
+
+# 🧾 앱 제목
+st.set_page_config(page_title="2025년 인구 현황", layout="wide")
+st.title("📊 2025년 5월 기준 상위 5개 행정구역 연령별 인구 현황")
+
 st.markdown("""
-당신의 성격은 어떤 직업에 가장 잘 어울릴까요?  
-MBTI를 선택하면, 성향에 맞는 찰떡 직업들을 추천해드려요!  
-자신에게 꼭 맞는 진로 방향을 찾아보세요 💡
+이 웹앱은 2025년 5월 기준 **총인구수 상위 5개 지역**의  
+연령별 인구 분포를 선그래프로 시각화합니다.  
+*단위: 명*
 """)
 
-st.divider()
+# 🖥 원본 데이터 표시
+st.subheader("📋 상위 5개 행정구역 연령별 인구 데이터")
+st.dataframe(df, use_container_width=True)
 
-# ✅ MBTI 유형 리스트
-mbti_list = [
-    "INTJ", "INTP", "ENTJ", "ENTP",
-    "INFJ", "INFP", "ENFJ", "ENFP",
-    "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-    "ISTP", "ISFP", "ESTP", "ESFP"
-]
+# 📈 선 그래프용 데이터 가공
+plot_df = df.drop(columns=["총인구수"]).set_index("행정구역")
+plot_df = plot_df.applymap(lambda x: int(str(x).replace(",", "")))  # 숫자형 변환
+plot_df = plot_df.T  # 연령을 인덱스로
 
-# 🎯 MBTI별 추천 직업 데이터
-mbti_jobs = {
-    "INTJ": ["📊 데이터 과학자", "🧠 인공지능 개발자", "🧮 전략 컨설턴트", "📈 시스템 설계자"],
-    "INTP": ["🔬 연구원", "📐 이론 물리학자", "👨‍💻 프로그래머", "🧪 UX 설계자"],
-    "ENTJ": ["🏢 CEO", "🗂 프로젝트 매니저", "⚖ 변호사", "💼 전략기획 전문가"],
-    "ENTP": ["🚀 창업가", "📣 마케팅 전문가", "🧑‍🔬 기술 분석가", "💡 아이디어 기획자"],
-    "INFJ": ["🧘 심리상담가", "🧑‍🏫 교사", "🖋 작가", "🌱 HR 전문가"],
-    "INFP": ["🎨 예술가", "📝 시나리오 작가", "📹 콘텐츠 제작자", "🧡 사회복지사"],
-    "ENFJ": ["🧑‍🏫 교육자", "📢 브랜드 매니저", "🧑‍💼 조직 리더", "🎤 발표자"],
-    "ENFP": ["🗺 여행 작가", "📺 콘텐츠 기획자", "📱 마케터", "🎨 기획 디자이너"],
-    "ISTJ": ["📋 공무원", "💰 회계사", "📊 데이터 분석가", "📦 품질 관리자"],
-    "ISFJ": ["🏥 간호사", "🧑‍💼 관리자", "🙋 고객 지원", "🧩 서비스 운영자"],
-    "ESTJ": ["🏦 금융 관리자", "🪖 군 간부", "📈 운영 책임자", "📉 회계 감사"],
-    "ESFJ": ["👩‍🏫 교사", "🏥 간호사", "🧑‍💼 인사담당자", "💬 세일즈 전문가"],
-    "ISTP": ["🔧 엔지니어", "🔍 보안 전문가", "🚗 자동차 정비사", "🛠 기술 분석가"],
-    "ISFP": ["👗 패션 디자이너", "📷 사진작가", "👨‍🍳 셰프", "🧘‍♀️ 물리치료사"],
-    "ESTP": ["💼 영업 전문가", "🚑 응급 구조사", "🎉 이벤트 기획자", "🥋 스포츠 코치"],
-    "ESFP": ["🎤 가수", "🎭 배우", "🕺 퍼포먼스 아티스트", "🌍 여행 가이드"]
-}
-
-# 🎯 MBTI 선택
-st.subheader("📌 MBTI 유형을 선택해주세요")
-selected_mbti = st.selectbox("👉 나의 성격 유형은?", mbti_list)
-
-# 💡 직업 추천 결과 출력
-if selected_mbti:
-    st.markdown(f"### 🎯 {selected_mbti} 유형에게 어울리는 직업 추천 리스트")
-    st.success("💡 아래 직업들은 당신의 성향과 정말 잘 어울리는 일들이에요!")
-    for job in mbti_jobs[selected_mbti]:
-        st.write(f"- {job}")
-
-    # 🎈 풍선 애니메이션
-    st.balloons()
-
-# 하단 정보
-st.divider()
-st.caption("✨ MBTI 직업 추천기는 재미와 참고용으로 활용해주세요. 궁극적인 진로 결정은 본인의 관심과 역량을 바탕으로 해주세요!")
+# 📉 선그래프 출력
+st.subheader("📈 연령별 인구 변화 그래프")
+st.line_chart(plot_df)
